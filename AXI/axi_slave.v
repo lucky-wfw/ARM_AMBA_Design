@@ -5,6 +5,10 @@
 // Created on 2020-11-20
 // Basic features mainly about write and read
 //----------------------------------------------------------------
+// Date: 2020-11-21
+// New features: the read process, resp mangament
+//----------------------------------------------------------------
+
 
 
 module axi_slave
@@ -89,14 +93,33 @@ reg [31:0] mem [7:0];
 reg mem_flag [7:0];
 
 //-----------------------------------------------------------
-// The state machine for write process
+// The definition of state machine for write process
 //-----------------------------------------------------------
 reg [2:0] wstate;
 reg [2:0] wnext_state;
+
 parameter w_idle = 3'b000, w_s1 = 3'b001, w_s2 = 3'b010, w_s3 = 3'b011,
 w_s4 = 3'b100, w_s5 = 3'b101, w_s6 = 3'b110, w_s7 = 3'b111;
+
 reg [addr_width-1:0] waddr_buffer;
 reg [data_width-1:0] wdata_buffer;
+
+
+//-----------------------------------------------------------
+// The definition of state machine for read process
+//-----------------------------------------------------------
+reg [1:0] rstate;
+reg [1:0] rnext_state;
+
+parameter r_idle = 2'b00, r_s1 = 2'b01, r_s2 = 2'b10;
+
+reg [addr_width-1:0] araddr_buffer;
+
+
+
+//-----------------------------------------------------------
+// The state machine for write process
+//-----------------------------------------------------------
 
 always @(posedge aclk, negedge aresetn) begin
   if(~aresetn) begin
@@ -243,12 +266,89 @@ always @(posedge aclk, negedge aresetn) begin
 end
 
 
+//-----------------------------------------------------------
+// The state machine for read process
+//-----------------------------------------------------------
 
+always @(posedge aclk, negedge aresetn) begin
+  if(!aresetn) begin
+    rstate <= r_idle;
+  end
+  else begin
+    rstate <= rnext_state;
+  end
+end
 
+always @(*) begin
+  case(rstate)
+    r_idle: begin
+      if(arvalid && arready) begin
+        rnext_state <= r_s1;
+      end
+      else begin
+        rnext_state <= r_idle;
+      end
+    end
+    r_s1: begin
+      if(rvalid && rready) begin
+        rnext_state <= r_s2;
+      end
+      else begin
+        rnext_state <= r_s1;
+      end
+    end
+    r_s2: begin
+      if(arvalid && arready) begin
+        rnext_state <= r_s1;
+      end
+      else begin
+        rnext_state <= r_idle;
+      end
+    end
+    default: begin
+      rnext_state <= r_idle;
+    end
+  endcase
+end
 
-
-
-
+always @(posedge aclk, negedge aresetn) begin
+  if(!aresetn) begin
+    rdata <= 32'd0;
+    rresp <= 2'd0;
+  end
+  else begin
+    case(rnext_state)
+      r_idle: begin
+        rdata <= rdata;
+        rresp <= rresp;
+      end
+      r_s1: begin
+        araddr_buffer <= araddr;
+      end
+      r_s2: begin
+        // read as write
+        if((araddr_buffer == waddr_buffer) && (wnext_state == w_s6)) begin
+          rdata <= wdata_buffer;
+          rresp <= 2'b00;
+        end
+        // read case with the mem has content
+        else if(mem_flag[araddr_buffer] == 1'b1)begin
+          rdata <= mem[araddr_buffer];
+          rresp <= 2'b00;
+        end
+        // the read mem has not been written, slave error resp
+        else begin
+          rdata <= 32'd0;
+          rresp <= 2'b10;
+        end
+      end
+      default: begin
+        rdata <= rdata;
+        rresp <= rresp;
+      end
+    endcase
+  end
+end
 
 
 endmodule
