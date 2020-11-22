@@ -41,7 +41,7 @@ module axi_slave
   input awregion,
   input awuser,
   input awvalid,
-  output reg awready,
+  output awready,
   
   // write data channel
   input wid,
@@ -50,13 +50,13 @@ module axi_slave
   input wlast,
   input wuser,
   input wvalid,
-  output reg wready,
+  output wready,
 
   // write response channel
   output reg bid,
   output reg [resp-1:0] bresp,
   output reg buser,
-  output reg bvalid,
+  output bvalid,
   input bready,
 
   // read address channel
@@ -72,7 +72,7 @@ module axi_slave
   input arregion,
   input aruser,
   input arvalid,
-  output reg arready,
+  output arready,
 
   // read data channel
   output reg rid,
@@ -80,7 +80,7 @@ module axi_slave
   output reg [resp-1:0] rresp,
   output reg rlast,
   output reg ruser,
-  output reg rvalid,
+  output rvalid,
   input rready
 );
 
@@ -349,6 +349,16 @@ always @(posedge aclk, negedge aresetn) begin
     endcase
   end
 end
+
+
+//-----------------------------------------------------------
+// Handshake signals of slave always valid
+//-----------------------------------------------------------
+assign awready = 1'b1;
+assign wready = 1'b1;
+assign bvalid = 1'b1;
+assign arready = 1'b1;
+assign rvalid = 1'b1;
 
 
 endmodule
