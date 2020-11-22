@@ -7,22 +7,28 @@
 //--------------------------------------------------------------------------
 // Date: 2020-11-22
 // New Features: write_addr_data, write_data_addr, write_addr_with_data,
-//               normal read, read empty memory
+//               normal read, read empty memory.
+//--------------------------------------------------------------------------
+// Date: 2020-11-22
+// New Features: burst-fixed, burst-incr, burst-wrap4
 //--------------------------------------------------------------------------
 
 `timescale 1ns/1ns
 
 module axi_slave_tb
 #(
-  parameter addr_width = 3,
-  parameter len = 8,
+  parameter addr_width = 4,
+  parameter len = 4,
   parameter size = 3,
   parameter burst_length = 2,
   parameter cache = 4,
   parameter prot = 3,
   parameter data_width = 32,
   parameter strb = 4,
-  parameter resp = 2
+  parameter resp = 2,
+  parameter fixed = 2'b00,
+  parameter incr = 2'b01,
+  parameter wrap = 2'b10
 )
 ();
 
@@ -93,7 +99,7 @@ initial begin
 
   awid = 0;
   awaddr = 0;
-  awlen = 0;
+  awlen = 4'd0;
   awsize = 0;
   awburst = 0;
   awlock = 0;
@@ -136,43 +142,9 @@ end
 // case test
 initial begin
 
-  #10 @(posedge aclk)
-  w_a_d(3'd1,32'd5);
-
-  /*
-
-  #10 @(posedge aclk)
-  w_d_a(3'd2,32'd10);
-
-  #10 @(posedge aclk)
-  w_a_with_d(3'd3,32'd20);
-
-  // normal read
-  #10 @(posedge aclk)
-  read(3'd1);
-
-  // read empty memory
-  #10 @(posedge aclk)
-  read(3'd5);
-
-  */
-
-  fork
-    // read and write the differnrt memory location
-    #50 @(posedge aclk)
-    w_d_a(3'd2,32'd10);
-
-    #50 @(posedge aclk)
-    read(3'd1);
-
-   // read and write the same memory location
-    #100 @(posedge aclk)
-    w_d_a(3'd3,32'd20);
-
-    #104 @(posedge aclk)
-    read(3'd3);
-
-  join
+  //#100 w_burst_fixed(4'd1,32'd5,4'd3);
+  //#100 w_burst_incr(4'd1,32'd5,4'd4);
+  #100 w_burst_wrap(4'd1,32'd5,4'd6);
 
 end
 
@@ -180,12 +152,15 @@ end
 
 
 
-// data after address
-task w_a_d(input [addr_width-1:0] address, input [data_width-1:0] data);
+// burst: fixed
+task w_burst_fixed(input [addr_width-1:0] address, input [data_width-1:0] data, 
+                   input [3:0] length);
 begin
   @(posedge aclk)
   awvalid = 1'b1;
   awaddr = address;
+  awburst = fixed;
+  awlen = length;
   @(posedge aclk)
   wvalid = 1'b1;
   wdata = data;
@@ -196,9 +171,84 @@ begin
   bready = 1'b1;
   wvalid = 1'b0;
   @(posedge aclk)
+  wdata = data + 2'd1;
+  @(posedge aclk)
+  wdata = data + 2'd2;
+  @(posedge aclk)
+  wdata = data + 2'd3;
+  #50 @(posedge aclk)
   bready = 1'b0;
 end
 endtask
+
+// burst: incr 4
+task w_burst_incr(input [addr_width-1:0] address, input [data_width-1:0] data, 
+                  input [3:0] length);
+begin
+  @(posedge aclk)
+  awvalid = 1'b1;
+  awaddr = address;
+  awburst = incr;
+  awlen = length;
+  @(posedge aclk)
+  wvalid = 1'b1;
+  wdata = data;
+  @(posedge aclk)
+  wvalid = 1'b1;
+  awvalid = 1'b0;
+  @(posedge aclk)
+  wdata = data + 2'd1;
+  @(posedge aclk)
+  wdata = data + 2'd2;
+  @(posedge aclk)
+  wdata = data + 2'd3;
+  @(posedge aclk)
+  wdata = data + 3'd4;
+  @(posedge aclk)
+  bready = 1'b1;
+  wvalid = 1'b0;
+  #50 @(posedge aclk)
+  bready = 1'b0;
+end
+endtask
+
+// burst: iwrap 4
+task w_burst_wrap(input [addr_width-1:0] address, input [data_width-1:0] data, 
+                  input [3:0] length);
+begin
+  @(posedge aclk)
+  awvalid = 1'b1;
+  awaddr = address;
+  awburst = wrap;
+  awlen = length;
+  @(posedge aclk)
+  wvalid = 1'b1;
+  wdata = data;
+  @(posedge aclk)
+  wvalid = 1'b1;
+  awvalid = 1'b0;
+  @(posedge aclk)
+  wdata = data + 2'd1;
+  @(posedge aclk)
+  wdata = data + 2'd2;
+  @(posedge aclk)
+  wdata = data + 2'd3;
+  @(posedge aclk)
+  wdata = data + 3'd4;
+  @(posedge aclk)
+  wdata = data + 3'd5;
+  @(posedge aclk)
+  wdata = data + 3'd6;
+  @(posedge aclk)
+  wdata = data + 3'd7;
+  @(posedge aclk)
+  bready = 1'b1;
+  wvalid = 1'b0;
+  #50 @(posedge aclk)
+  bready = 1'b0;
+end
+endtask
+
 
 // address after data
 task w_d_a(input [addr_width-1:0] address, input [data_width-1:0] data);
@@ -319,6 +369,8 @@ axi_slave dut(
 .rvalid(rvalid),
 .rready(rready)
 );
+
+
 
 
 endmodule
