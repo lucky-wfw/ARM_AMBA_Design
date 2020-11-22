@@ -8,13 +8,16 @@
 // Date: 2020-11-21
 // New features: the read process, resp mangament
 //----------------------------------------------------------------
+// Date: 2020-11-22
+// New features: write burst-fixed, incr, wrap
+//----------------------------------------------------------------
 
 
 
 module axi_slave
 #(
-  parameter addr_width = 3,
-  parameter len = 8,
+  parameter addr_width = 4,
+  parameter len = 4,
   parameter size = 3,
   parameter burst_length = 2,
   parameter cache = 4,
@@ -89,20 +92,27 @@ module axi_slave
 // flag = 0: has not been written
 // flag = 1: has been written
 //-----------------------------------------------------------
-reg [31:0] mem [7:0];
-reg mem_flag [7:0];
+reg [31:0] mem [15:0];
+reg mem_flag [15:0];
 
 //-----------------------------------------------------------
 // The definition of state machine for write process
 //-----------------------------------------------------------
-reg [2:0] wstate;
-reg [2:0] wnext_state;
+reg [3:0] wstate;
+reg [3:0] wnext_state;
 
-parameter w_idle = 3'b000, w_s1 = 3'b001, w_s2 = 3'b010, w_s3 = 3'b011,
-w_s4 = 3'b100, w_s5 = 3'b101, w_s6 = 3'b110, w_s7 = 3'b111;
+parameter w_idle = 4'b0000, w_s1 = 4'b0001, w_s2 = 4'b0010, 
+w_s3 = 4'b0011, w_s4 = 4'b0100, w_s5 = 4'b0101, w_s6 = 4'b0110, 
+w_s7 = 4'b0111, w_s8 = 4'b1000;
 
 reg [addr_width-1:0] waddr_buffer;
 reg [data_width-1:0] wdata_buffer;
+
+reg [len-1:0] fixed_cnt;
+reg [len-1:0] incr_cnt;
+reg [len-1:0] wrap_cnt;
+
+
 
 
 //-----------------------------------------------------------
@@ -115,6 +125,22 @@ parameter r_idle = 2'b00, r_s1 = 2'b01, r_s2 = 2'b10;
 
 reg [addr_width-1:0] araddr_buffer;
 
+//-----------------------------------------------------------
+// The definition for burst type
+//-----------------------------------------------------------
+parameter fixed = 2'b00;
+parameter incr = 2'b01;
+parameter wrap = 2'b10;
+parameter reserved = 2'b11;
+
+reg [1:0] w_burst_type;
+
+reg [len-1:0] awlen_buffer;
+reg [size-1:0] awsize_buffer;
+
+reg fixed_flag;
+reg incr_flag;
+reg wrap_flag;
 
 
 //-----------------------------------------------------------
@@ -147,6 +173,15 @@ always @(*) begin
       end
     end
     w_s1: begin
+      // burst related
+      case(awburst)
+        fixed: w_burst_type <= fixed;
+        incr: w_burst_type <= incr;
+        wrap: w_burst_type <= wrap;
+        default: w_burst_type <= reserved;
+      endcase
+      awlen_buffer <= awlen;
+
       if(wvalid && wready) begin
         wnext_state <= w_s2;
       end
@@ -166,20 +201,69 @@ always @(*) begin
       end
     end
     w_s4: begin
-        wnext_state <= w_s6;
+      // burst related
+      case(awburst)
+        fixed: w_burst_type <= fixed;
+        incr: w_burst_type <= incr;
+        wrap: w_burst_type <= wrap;
+        default: w_burst_type <= reserved;
+      endcase
+      awlen_buffer <= awlen;
+
+      wnext_state <= w_s6;
     end
     w_s5: begin
-        wnext_state <= w_s6;
+      // burst related
+      case(awburst)
+        fixed: w_burst_type <= fixed;
+        incr: w_burst_type <= incr;
+        wrap: w_burst_type <= wrap;
+        default: w_burst_type <= reserved;
+      endcase
+      awlen_buffer <= awlen;
+
+      wnext_state <= w_s6;
     end
     w_s6: begin
-      if(bvalid && bready) begin
-        wnext_state <= w_s7;
-      end
-      else begin
-        wnext_state <= w_s6;
-      end
+      case(w_burst_type)
+        fixed: begin
+          if(fixed_flag == 1'b0) begin
+            wnext_state <= w_s6;
+          end
+          else begin
+            wnext_state <= w_s7;
+          end
+        end
+        incr: begin
+          if(incr_flag == 1'b0) begin
+            wnext_state <= w_s6;
+          end
+          else begin
+            wnext_state <= w_s7;
+          end
+        end
+        wrap: begin
+          if(wrap_flag == 1'b0) begin
+            wnext_state <= w_s6;
+          end
+          else begin
+            wnext_state <= w_s7;
+          end
+        end
+        reserved: begin
+          wnext_state <= w_s7;
+        end
+      endcase
     end
     w_s7: begin
+      if(bvalid && bready) begin
+        wnext_state <= w_s8;
+      end
+      else begin
+        wnext_state <= w_s7;
+      end
+    end
+    w_s8: begin
       if(wvalid && wready && awvalid && awready) begin
         wnext_state <= w_s5;
       end
@@ -207,9 +291,25 @@ always @(posedge aclk, negedge aresetn) begin
     mem_flag[5] <= 1'b0;
     mem_flag[6] <= 1'b0;
     mem_flag[7] <= 1'b0;
+    mem_flag[8] <= 1'b0;
+    mem_flag[9] <= 1'b0;
+    mem_flag[10] <= 1'b0;
+    mem_flag[11] <= 1'b0;
+    mem_flag[12] <= 1'b0;
+    mem_flag[13] <= 1'b0;
+    mem_flag[14] <= 1'b0;
+    mem_flag[15] <= 1'b0;
     waddr_buffer <= 3'd0;
     wdata_buffer <= 32'd0;
     bresp <= 2'b00;
+    // burst
+    fixed_flag <= 1'b0;
+    incr_flag <= 1'b0;
+    wrap_flag <= 1'b0;
+    fixed_cnt <= 4'd0;
+    incr_cnt <= 4'd0;
+    wrap_cnt <= 4'd0;
+
   end
   else begin
     case(wnext_state)
@@ -222,9 +322,24 @@ always @(posedge aclk, negedge aresetn) begin
         mem_flag[5] <= mem_flag[5];
         mem_flag[6] <= mem_flag[6];
         mem_flag[7] <= mem_flag[7];
+        mem_flag[8] <= mem_flag[8];
+        mem_flag[9] <= mem_flag[9];
+        mem_flag[10] <= mem_flag[10];
+        mem_flag[11] <= mem_flag[11];
+        mem_flag[12] <= mem_flag[12];
+        mem_flag[13] <= mem_flag[13];
+        mem_flag[14] <= mem_flag[14];
+        mem_flag[15] <= mem_flag[15];
         waddr_buffer <= waddr_buffer;
         wdata_buffer <= wdata_buffer;
         bresp <= bresp;
+        // burst
+        fixed_flag <= 1'b0;
+        incr_flag <= 1'b0;
+        wrap_flag <= 1'b0;
+        fixed_cnt <= 4'd0;
+        incr_cnt <= 4'd0;
+        wrap_cnt <= 4'd0;
       end
       w_s1: begin
         waddr_buffer <= awaddr;
@@ -243,10 +358,65 @@ always @(posedge aclk, negedge aresetn) begin
         waddr_buffer <= awaddr;
       end
       w_s6: begin
-        mem[waddr_buffer] <= wdata_buffer;
-        mem_flag[waddr_buffer] <= 1'b1;
+        case(w_burst_type)
+          fixed: begin
+            if(fixed_cnt <= awlen_buffer) begin
+              mem[waddr_buffer] <= wdata;
+              mem_flag[waddr_buffer] <= 1'b1;
+              fixed_flag <= 1'b0;
+              fixed_cnt <= fixed_cnt + 1'b1;
+            end
+            else begin
+              fixed_cnt <= 4'd0;
+              fixed_flag <= 1'b1;
+            end
+          end
+          incr: begin
+            if(incr_cnt <= awlen_buffer) begin
+              mem[waddr_buffer + incr_cnt] <= wdata;
+              mem_flag[waddr_buffer + incr_cnt] <= 1'b1;
+              incr_flag <= 1'b0;
+              incr_cnt <= incr_cnt + 1'b1;
+            end
+            else begin
+              incr_cnt <= 4'd0;
+              incr_flag <= 1'b1;
+            end
+          end
+          // wrap 4
+          wrap: begin
+            if(wrap_cnt <= awlen_buffer) begin
+              if(wrap_cnt <= 3) begin
+                mem[waddr_buffer + wrap_cnt] <= wdata;
+                mem_flag[waddr_buffer + wrap_cnt] <= 1'b1;
+                wrap_flag <= 1'b0;
+                wrap_cnt <= wrap_cnt + 1'b1;
+              end
+              else begin
+                mem[waddr_buffer + wrap_cnt - 4] <= wdata;
+                mem_flag[waddr_buffer + wrap_cnt - 4] <= 1'b1;
+                wrap_flag <= 1'b0;
+                wrap_cnt <= wrap_cnt + 1'b1;
+              end
+            end
+            else begin
+              wrap_cnt <= 4'd0;
+              wrap_flag <= 1'b1;
+            end
+          end
+          default: begin
+          end
+        endcase
       end
       w_s7: begin
+        fixed_flag <= 1'b0;
+        incr_flag <= 1'b0;
+        wrap_flag <= 1'b0;
+        fixed_cnt <= 4'd0;
+        incr_cnt <= 4'd0;
+        wrap_cnt <= 4'd0;
+      end
+      w_s8: begin
         bresp <= 2'b00;
       end
       default: begin
@@ -258,8 +428,23 @@ always @(posedge aclk, negedge aresetn) begin
         mem_flag[5] <= mem_flag[5];
         mem_flag[6] <= mem_flag[6];
         mem_flag[7] <= mem_flag[7];
+        mem_flag[8] <= mem_flag[8];
+        mem_flag[9] <= mem_flag[9];
+        mem_flag[10] <= mem_flag[10];
+        mem_flag[11] <= mem_flag[11];
+        mem_flag[12] <= mem_flag[12];
+        mem_flag[13] <= mem_flag[13];
+        mem_flag[14] <= mem_flag[14];
+        mem_flag[15] <= mem_flag[15];
         waddr_buffer <= waddr_buffer;
         wdata_buffer <= wdata_buffer;
+
+        fixed_flag <= 1'b0;
+        incr_flag <= 1'b0;
+        wrap_flag <= 1'b0;
+        fixed_cnt <= 4'd0;
+        incr_cnt <= 4'd0;
+        wrap_cnt <= 4'd0;
       end
     endcase
   end
