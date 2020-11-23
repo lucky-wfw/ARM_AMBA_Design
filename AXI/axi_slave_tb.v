@@ -13,13 +13,14 @@
 // New Features: write burst-fixed, burst-incr, burst-wrap4
 //--------------------------------------------------------------------------
 // Date: 2020-11-23
-// New Features: read burst-fixed, burst-incr, burst-wrap4
+// New Features: read burst-fixed, burst-incr, burst-wrap4, id
 //--------------------------------------------------------------------------
 
 `timescale 1ns/1ns
 
 module axi_slave_tb
 #(
+  parameter id = 2'b01,
   parameter addr_width = 4,
   parameter len = 4,
   parameter size = 3,
@@ -40,7 +41,7 @@ reg aclk;
 reg aresetn;
   
   // write address channel
-reg awid;
+reg [1:0] awid;
 reg [addr_width-1:0] awaddr;
 reg [len-1:0] awlen;
 reg [size-1:0] awsize;
@@ -55,7 +56,7 @@ reg awvalid;
 wire awready;
   
 // write data channel
-reg wid;
+reg [1:0] wid;
 reg [data_width-1:0] wdata;
 reg [strb-1:0] wstrb;
 reg wlast;
@@ -64,14 +65,14 @@ reg wvalid;
 wire wready;
 
 // write response channel
-wire bid;
+wire [1:0] bid;
 wire [resp-1:0] bresp;
 wire buser;
 wire bvalid;
 reg bready;
 
 // read address channel
-reg arid;
+reg [1:0] arid;
 reg [addr_width-1:0] araddr;
 reg [len-1:0] arlen;
 reg [size-1:0] arsize;
@@ -86,7 +87,7 @@ reg arvalid;
 wire arready;
 
   // read data channel
-wire rid;
+wire [1:0] rid;
 wire [data_width-1:0] rdata;
 wire [resp-1:0] rresp;
 wire rlast;
@@ -145,6 +146,9 @@ end
 // case test
 initial begin
 
+
+  id_check();
+
   //#100 w_burst_fixed(4'd1,32'd5,4'd3);
   //#100 w_burst_incr(4'd1,32'd5,4'd4);
   #100 w_burst_wrap(4'd1,32'd5,4'd6);
@@ -155,7 +159,13 @@ initial begin
 
 end
 
-
+task id_check();
+begin
+  awid = id;
+  wid = id;
+  arid = id;
+end
+endtask
 
 
 
