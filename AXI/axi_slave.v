@@ -11,6 +11,9 @@
 // Date: 2020-11-22
 // New features: write burst-fixed, incr, wrap
 //----------------------------------------------------------------
+// Date: 2020-11-23
+// New features: read burst-fixed, incr, wrap
+//----------------------------------------------------------------
 
 
 
@@ -112,19 +115,19 @@ reg [len-1:0] fixed_cnt;
 reg [len-1:0] incr_cnt;
 reg [len-1:0] wrap_cnt;
 
-
-
-
 //-----------------------------------------------------------
 // The definition of state machine for read process
 //-----------------------------------------------------------
 reg [1:0] rstate;
 reg [1:0] rnext_state;
 
-parameter r_idle = 2'b00, r_s1 = 2'b01, r_s2 = 2'b10;
+parameter r_idle = 2'b00, r_s1 = 2'b01, r_s2 = 2'b10, r_s3 = 2'b11;
 
 reg [addr_width-1:0] araddr_buffer;
 
+reg [len-1:0] r_fixed_cnt;
+reg [len-1:0] r_incr_cnt;
+reg [len-1:0] r_wrap_cnt;
 //-----------------------------------------------------------
 // The definition for burst type
 //-----------------------------------------------------------
@@ -141,6 +144,15 @@ reg [size-1:0] awsize_buffer;
 reg fixed_flag;
 reg incr_flag;
 reg wrap_flag;
+
+reg [1:0] r_burst_type;
+
+reg [len-1:0] arlen_buffer;
+reg [size-1:0] arsize_buffer;
+
+reg r_fixed_flag;
+reg r_incr_flag;
+reg r_wrap_flag;
 
 
 //-----------------------------------------------------------
@@ -475,6 +487,15 @@ always @(*) begin
       end
     end
     r_s1: begin
+      // burst related
+      case(arburst)
+        fixed: r_burst_type <= fixed;
+        incr: r_burst_type <= incr;
+        wrap: r_burst_type <= wrap;
+        default: r_burst_type <= reserved;
+      endcase
+      arlen_buffer <= arlen;
+
       if(rvalid && rready) begin
         rnext_state <= r_s2;
       end
@@ -483,12 +504,55 @@ always @(*) begin
       end
     end
     r_s2: begin
-      if(arvalid && arready) begin
-        rnext_state <= r_s1;
-      end
-      else begin
-        rnext_state <= r_idle;
-      end
+      case(r_burst_type)
+        fixed: begin
+          if(r_fixed_flag == 1'b0) begin
+            rnext_state <= r_s2;
+          end
+          else begin
+            if(arvalid && arready) begin
+              rnext_state <= r_s1;
+            end
+            else begin
+              rnext_state <= r_idle;
+            end
+          end
+        end
+        incr: begin
+          if(r_incr_flag == 1'b0) begin
+            rnext_state <= r_s2;
+          end
+          else begin
+            if(arvalid && arready) begin
+              rnext_state <= r_s1;
+            end
+            else begin
+              rnext_state <= r_idle;
+            end
+          end
+        end
+        wrap: begin
+          if(r_wrap_flag == 1'b0) begin
+            rnext_state <= r_s2;
+          end
+          else begin
+            if(arvalid && arready) begin
+              rnext_state <= r_s1;
+            end
+            else begin
+              rnext_state <= r_idle;
+            end
+          end
+        end
+        default: begin
+            if(arvalid && arready) begin
+              rnext_state <= r_s1;
+            end
+            else begin
+              rnext_state <= r_idle;
+            end
+        end
+      endcase
     end
     default: begin
       rnext_state <= r_idle;
@@ -500,32 +564,129 @@ always @(posedge aclk, negedge aresetn) begin
   if(!aresetn) begin
     rdata <= 32'd0;
     rresp <= 2'd0;
+    r_fixed_flag <= 1'b0;
+    r_fixed_cnt <= 4'd0;
+    r_incr_flag <= 1'b0;
+    r_incr_cnt <= 4'd0;
+    r_incr_flag <= 1'b0;
+    r_incr_cnt <= 4'd0;
   end
   else begin
     case(rnext_state)
       r_idle: begin
         rdata <= rdata;
         rresp <= rresp;
+        r_fixed_flag <= 1'b0;
+        r_fixed_cnt <= 4'd0;
+        r_incr_flag <= 1'b0;
+        r_incr_cnt <= 4'd0;
+        r_incr_flag <= 1'b0;
+        r_incr_cnt <= 4'd0;
       end
       r_s1: begin
         araddr_buffer <= araddr;
       end
       r_s2: begin
-        // read as write
-        if((araddr_buffer == waddr_buffer) && (wnext_state == w_s6)) begin
-          rdata <= wdata_buffer;
-          rresp <= 2'b00;
-        end
-        // read case with the mem has content
-        else if(mem_flag[araddr_buffer] == 1'b1)begin
-          rdata <= mem[araddr_buffer];
-          rresp <= 2'b00;
-        end
-        // the read mem has not been written, slave error resp
-        else begin
-          rdata <= 32'd0;
-          rresp <= 2'b10;
-        end
+        case(r_burst_type)
+          fixed: begin
+            if(r_fixed_cnt <= arlen_buffer) begin
+              // read as write
+              if((araddr_buffer == waddr_buffer) && (wnext_state == w_s6)) begin
+                rdata <= wdata_buffer;
+                rresp <= 2'b00;
+              end
+              // read case with the mem has content
+              else if(mem_flag[araddr_buffer] == 1'b1)begin
+                rdata <= mem[araddr_buffer];
+                rresp <= 2'b00;
+              end
+              // the read mem has not been written, slave error resp
+              else begin
+                rdata <= 32'd0;
+                rresp <= 2'b10;
+              end
+              r_fixed_flag <= 1'b0;
+              r_fixed_cnt <= r_fixed_cnt + 1'b1;
+            end
+            else begin
+              r_fixed_flag <= 1'b1;
+              r_fixed_cnt <= 4'd0;
+            end
+          end
+          incr: begin
+            if(r_incr_cnt <= arlen_buffer) begin
+              // read as write
+              if((araddr_buffer == waddr_buffer) && (wnext_state == w_s6)) begin
+                rdata <= wdata_buffer;
+                rresp <= 2'b00;
+              end
+              // read case with the mem has content
+              else if(mem_flag[araddr_buffer + r_incr_cnt] == 1'b1)begin
+                rdata <= mem[araddr_buffer + r_incr_cnt];
+                rresp <= 2'b00;
+              end
+              // the read mem has not been written, slave error resp
+              else begin
+                rdata <= 32'd0;
+                rresp <= 2'b10;
+              end
+              r_incr_flag <= 1'b0;
+              r_incr_cnt <= r_incr_cnt + 1'b1;
+            end
+            else begin
+              r_incr_flag <= 1'b1;
+              r_incr_cnt <= 4'd0;
+            end
+          end
+          wrap: begin
+            if(r_wrap_cnt <= arlen_buffer) begin
+              if(r_wrap_cnt <= 3) begin
+                // read as write
+                if((araddr_buffer == waddr_buffer) && (wnext_state == w_s6)) begin
+                  rdata <= wdata_buffer;
+                  rresp <= 2'b00;
+                end
+                // read case with the mem has content
+                else if(mem_flag[araddr_buffer + r_wrap_cnt] == 1'b1)begin
+                  rdata <= mem[araddr_buffer + r_wrap_cnt];
+                  rresp <= 2'b00;
+                end
+                // the read mem has not been written, slave error resp
+                else begin
+                  rdata <= 32'd0;
+                  rresp <= 2'b10;
+                end
+                r_wrap_flag <= 1'b0;
+                r_wrap_cnt <= r_wrap_cnt + 1'b1;
+              end
+              else begin
+                // read as write
+                if((araddr_buffer == waddr_buffer) && (wnext_state == w_s6)) begin
+                  rdata <= wdata_buffer;
+                  rresp <= 2'b00;
+                end
+                // read case with the mem has content
+                else if(mem_flag[araddr_buffer + r_wrap_cnt - 4] == 1'b1)begin
+                  rdata <= mem[araddr_buffer + r_wrap_cnt - 4];
+                  rresp <= 2'b00;
+                end
+                // the read mem has not been written, slave error resp
+                else begin
+                  rdata <= 32'd0;
+                  rresp <= 2'b10;
+                end
+                r_wrap_flag <= 1'b0;
+                r_wrap_cnt <= r_wrap_cnt + 1'b1;
+              end
+            end
+            else begin
+              r_wrap_flag <= 1'b1;
+              r_wrap_cnt <= 4'd0;
+            end
+          end
+          default: begin
+          end
+        endcase
       end
       default: begin
         rdata <= rdata;
