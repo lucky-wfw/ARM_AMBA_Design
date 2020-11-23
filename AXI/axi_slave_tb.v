@@ -10,7 +10,10 @@
 //               normal read, read empty memory.
 //--------------------------------------------------------------------------
 // Date: 2020-11-22
-// New Features: burst-fixed, burst-incr, burst-wrap4
+// New Features: write burst-fixed, burst-incr, burst-wrap4
+//--------------------------------------------------------------------------
+// Date: 2020-11-23
+// New Features: read burst-fixed, burst-incr, burst-wrap4
 //--------------------------------------------------------------------------
 
 `timescale 1ns/1ns
@@ -145,6 +148,10 @@ initial begin
   //#100 w_burst_fixed(4'd1,32'd5,4'd3);
   //#100 w_burst_incr(4'd1,32'd5,4'd4);
   #100 w_burst_wrap(4'd1,32'd5,4'd6);
+
+  //read_burst_fixed(4'd1,4'd5);
+  //read_burst_incr(4'd1,4'd3);
+  read_burst_wrap(4'd1,4'd6);
 
 end
 
@@ -297,6 +304,54 @@ begin
   @(posedge aclk)
   arvalid = 1'b1;
   araddr = address;
+  @(posedge aclk)
+  rready = 1'b1;
+  arvalid = 1'b0;
+  @(posedge aclk)
+  rready = 1'b0;
+end
+endtask
+
+// read process burst fixed
+task read_burst_fixed(input [addr_width-1:0] address, input [3:0] length);
+begin
+  @(posedge aclk)
+  arvalid = 1'b1;
+  araddr = address;
+  arlen = length;
+  arburst = fixed;
+  @(posedge aclk)
+  rready = 1'b1;
+  arvalid = 1'b0;
+  @(posedge aclk)
+  rready = 1'b0;
+end
+endtask
+
+// read process burst incr
+task read_burst_incr(input [addr_width-1:0] address, input [3:0] length);
+begin
+  @(posedge aclk)
+  arvalid = 1'b1;
+  araddr = address;
+  arlen = length;
+  arburst = incr;
+  @(posedge aclk)
+  rready = 1'b1;
+  arvalid = 1'b0;
+  @(posedge aclk)
+  rready = 1'b0;
+end
+endtask
+
+// read process burst wrap
+task read_burst_wrap(input [addr_width-1:0] address, input [3:0] length);
+begin
+  @(posedge aclk)
+  arvalid = 1'b1;
+  araddr = address;
+  arlen = length;
+  arburst = wrap;
   @(posedge aclk)
   rready = 1'b1;
   arvalid = 1'b0;
