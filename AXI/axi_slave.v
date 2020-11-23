@@ -13,12 +13,14 @@
 //----------------------------------------------------------------
 // Date: 2020-11-23
 // New features: read burst-fixed, incr, wrap
+// New features: ID
 //----------------------------------------------------------------
 
 
 
 module axi_slave
 #(
+  parameter id = 2'b01,
   parameter addr_width = 4,
   parameter len = 4,
   parameter size = 3,
@@ -35,7 +37,7 @@ module axi_slave
   input aresetn,
   
   // write address channel
-  input awid,
+  input [1:0] awid,
   input [addr_width-1:0] awaddr,
   input [len-1:0] awlen,
   input [size-1:0] awsize,
@@ -50,7 +52,7 @@ module axi_slave
   output awready,
   
   // write data channel
-  input wid,
+  input [1:0] wid,
   input [data_width-1:0] wdata,
   input [strb-1:0] wstrb,
   input wlast,
@@ -59,14 +61,14 @@ module axi_slave
   output wready,
 
   // write response channel
-  output reg bid,
+  output reg [1:0] bid,
   output reg [resp-1:0] bresp,
   output reg buser,
   output bvalid,
   input bready,
 
   // read address channel
-  input arid,
+  input [1:0] arid,
   input [addr_width-1:0] araddr,
   input [len-1:0] arlen,
   input [size-1:0] arsize,
@@ -81,7 +83,7 @@ module axi_slave
   output arready,
 
   // read data channel
-  output reg rid,
+  output reg [1:0] rid,
   output reg [data_width-1:0] rdata,
   output reg [resp-1:0] rresp,
   output reg rlast,
@@ -154,6 +156,16 @@ reg r_fixed_flag;
 reg r_incr_flag;
 reg r_wrap_flag;
 
+//-----------------------------------------------------------
+// The definition for transaction channel id
+//-----------------------------------------------------------
+wire id_enable_w;
+
+wire id_enable_r;
+
+assign id_enable_w = (awid == id) && (wid == id);
+
+assign id_enable_r = (arid == id);
 
 //-----------------------------------------------------------
 // The state machine for write process
@@ -171,13 +183,13 @@ end
 always @(*) begin
   case(wstate)
     w_idle: begin
-      if(wvalid && wready && awvalid && awready) begin
+      if(wvalid && wready && awvalid && awready && id_enable_w) begin
         wnext_state <= w_s5;
       end
-      else if(wvalid && wready) begin
+      else if(wvalid && wready && id_enable_w) begin
         wnext_state <= w_s3;
       end
-      else if(awvalid && awready) begin
+      else if(awvalid && awready && id_enable_w) begin
         wnext_state <= w_s1;
       end
       else begin
@@ -479,7 +491,7 @@ end
 always @(*) begin
   case(rstate)
     r_idle: begin
-      if(arvalid && arready) begin
+      if(arvalid && arready && id_enable_r) begin
         rnext_state <= r_s1;
       end
       else begin
