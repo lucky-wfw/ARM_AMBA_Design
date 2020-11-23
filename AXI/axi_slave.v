@@ -545,12 +545,12 @@ always @(*) begin
           end
         end
         default: begin
-            if(arvalid && arready) begin
-              rnext_state <= r_s1;
-            end
-            else begin
-              rnext_state <= r_idle;
-            end
+          if(arvalid && arready) begin
+            rnext_state <= r_s1;
+          end
+          else begin
+            rnext_state <= r_idle;
+          end
         end
       endcase
     end
@@ -580,8 +580,8 @@ always @(posedge aclk, negedge aresetn) begin
         r_fixed_cnt <= 4'd0;
         r_incr_flag <= 1'b0;
         r_incr_cnt <= 4'd0;
-        r_incr_flag <= 1'b0;
-        r_incr_cnt <= 4'd0;
+        r_wrap_flag <= 1'b0;
+        r_wrap_cnt <= 4'd0;
       end
       r_s1: begin
         araddr_buffer <= araddr;
