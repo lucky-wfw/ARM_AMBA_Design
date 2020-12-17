@@ -3,6 +3,7 @@
 // The testbench of axi4_lite_slave
 // Author: WangFW
 // Created on 2020-12-17
+// feature: write, strb
 //--------------------------------------------------------------------------
 
 
@@ -74,18 +75,22 @@ end
 
 // write data test
 initial begin
-  #50 w_a_d(3'd1,32'd100);
-  #50 w_d_a(3'd2,32'd200);
+  #50 w_a_d(3'd1,32'd100,4'b1111);
+  #50 w_d_a(3'd2,32'd200,4'b1111);
+  #50 w_a_d(3'd3,32'h1234_5678,4'b1111);
+  #50 w_a_d(3'd3,32'h9999_aaaa,4'b1010);
 
 end
 
 
 // data after address
-task w_a_d(input [addr_width-1:0] address, input [data_width-1:0] data);
+task w_a_d(input [addr_width-1:0] address, input [data_width-1:0] data,
+           input [strb_width-1:0] strb);
 begin
   @(posedge aclk)
   awvalid = 1'b1;
   awaddr = address;
+  wstrb = strb;
   @(posedge aclk)
   wvalid = 1'b1;
   wdata = data;
@@ -101,11 +106,13 @@ end
 endtask
 
 // address after data
-task w_d_a(input [addr_width-1:0] address, input [data_width-1:0] data);
-begin
+task w_d_a(input [addr_width-1:0] address, input [data_width-1:0] data,
+           input [strb_width-1:0] strb);
+begin 
   @(posedge aclk)
   wvalid = 1'b1;
   wdata = data;
+  wstrb = strb;
   @(posedge aclk)
   awvalid = 1'b1;
   awaddr = address;
