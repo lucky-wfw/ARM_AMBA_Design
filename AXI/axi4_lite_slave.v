@@ -5,7 +5,7 @@
 // Created on 2020-12-16
 //--------------------------------------------------------------------------
 // date: 2020-12-17
-// write process
+// write process, wstrb feature
 //--------------------------------------------------------------------------
 
 module axi4_lite_slave
@@ -183,8 +183,117 @@ always @(posedge aclk, negedge aresetn) begin
         w_addr_buff <= awaddr;
       end
       w_s5: begin
-        mem[w_addr_buff] <= w_data_buff;
-        mem_flag[w_addr_buff] <= 1'b1;
+        case(wstrb)
+          4'b0000: begin
+            mem[w_addr_buff] <= mem[w_addr_buff];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b0001: begin
+            mem[w_addr_buff][7:0] <= w_data_buff[7:0];
+            mem[w_addr_buff][15:8] <= mem[w_addr_buff][15:8];
+            mem[w_addr_buff][23:16] <= mem[w_addr_buff][23:16];
+            mem[w_addr_buff][31:24] <= mem[w_addr_buff][31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b0010: begin
+            mem[w_addr_buff][7:0] <= mem[w_addr_buff][7:0];
+            mem[w_addr_buff][15:8] <= w_data_buff[15:8];
+            mem[w_addr_buff][23:16] <= mem[w_addr_buff][23:16];
+            mem[w_addr_buff][31:24] <= mem[w_addr_buff][31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b0011: begin
+            mem[w_addr_buff][7:0] <= w_data_buff[7:0];
+            mem[w_addr_buff][15:8] <= w_data_buff[15:8];
+            mem[w_addr_buff][23:16] <= mem[w_addr_buff][23:16];
+            mem[w_addr_buff][31:24] <= mem[w_addr_buff][31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b0100: begin
+            mem[w_addr_buff][7:0] <= mem[w_addr_buff][7:0];
+            mem[w_addr_buff][15:8] <= mem[w_addr_buff][15:8];
+            mem[w_addr_buff][23:16] <= w_data_buff[23:16];
+            mem[w_addr_buff][31:24] <= mem[w_addr_buff][31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b0101: begin
+            mem[w_addr_buff][7:0] <= w_data_buff[7:0];
+            mem[w_addr_buff][15:8] <= mem[w_addr_buff][15:8];
+            mem[w_addr_buff][23:16] <= w_data_buff[23:16];
+            mem[w_addr_buff][31:24] <= mem[w_addr_buff][31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b0110: begin
+            mem[w_addr_buff][7:0] <= mem[w_addr_buff][7:0];
+            mem[w_addr_buff][15:8] <= w_data_buff[15:8];
+            mem[w_addr_buff][23:16] <= w_data_buff[23:16];
+            mem[w_addr_buff][31:24] <= mem[w_addr_buff][31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b0111: begin
+            mem[w_addr_buff][7:0] <= w_data_buff[7:0];
+            mem[w_addr_buff][15:8] <= w_data_buff[15:8];
+            mem[w_addr_buff][23:16] <= w_data_buff[23:16];
+            mem[w_addr_buff][31:24] <= mem[w_addr_buff][31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b1000: begin
+            mem[w_addr_buff][7:0] <= mem[w_addr_buff][7:0];
+            mem[w_addr_buff][15:8] <= mem[w_addr_buff][15:8];
+            mem[w_addr_buff][23:16] <= mem[w_addr_buff][23:16];
+            mem[w_addr_buff][31:24] <= w_data_buff[31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b1001: begin
+            mem[w_addr_buff][7:0] <= w_data_buff[7:0];
+            mem[w_addr_buff][15:8] <= mem[w_addr_buff][15:8];
+            mem[w_addr_buff][23:16] <= mem[w_addr_buff][23:16];
+            mem[w_addr_buff][31:24] <= w_data_buff[31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b1010: begin
+            mem[w_addr_buff][7:0] <= mem[w_addr_buff][7:0];
+            mem[w_addr_buff][15:8] <= w_data_buff[15:8];
+            mem[w_addr_buff][23:16] <= mem[w_addr_buff][23:16];
+            mem[w_addr_buff][31:24] <= w_data_buff[31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b1011: begin
+            mem[w_addr_buff][7:0] <= w_data_buff[7:0];
+            mem[w_addr_buff][15:8] <= w_data_buff[15:8];
+            mem[w_addr_buff][23:16] <= mem[w_addr_buff][23:16];
+            mem[w_addr_buff][31:24] <= w_data_buff[31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b1100: begin
+            mem[w_addr_buff][7:0] <= mem[w_addr_buff][7:0];
+            mem[w_addr_buff][15:8] <= mem[w_addr_buff][15:8];
+            mem[w_addr_buff][23:16] <= w_data_buff[23:16];
+            mem[w_addr_buff][31:24] <= w_data_buff[31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b1101: begin
+            mem[w_addr_buff][7:0] <= w_data_buff[7:0];
+            mem[w_addr_buff][15:8] <= mem[w_addr_buff][15:8];
+            mem[w_addr_buff][23:16] <= w_data_buff[23:16];
+            mem[w_addr_buff][31:24] <= w_data_buff[31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b1110: begin
+            mem[w_addr_buff][7:0] <= mem[w_addr_buff][7:0];
+            mem[w_addr_buff][15:8] <= w_data_buff[15:8];
+            mem[w_addr_buff][23:16] <= w_data_buff[23:16];
+            mem[w_addr_buff][31:24] <= w_data_buff[31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+          4'b1111: begin
+            mem[w_addr_buff][7:0] <= w_data_buff[7:0];
+            mem[w_addr_buff][15:8] <= w_data_buff[15:8];
+            mem[w_addr_buff][23:16] <= w_data_buff[23:16];
+            mem[w_addr_buff][31:24] <= w_data_buff[31:24];
+            mem_flag[w_addr_buff] <= 1'b1;
+          end
+        endcase
       end
       w_s6: begin
         bresp <= 2'b00;
@@ -197,9 +306,6 @@ always @(posedge aclk, negedge aresetn) begin
     endcase
   end
 end
-
-
-
 
 
 
