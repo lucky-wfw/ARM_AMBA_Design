@@ -5,6 +5,9 @@
 // Created on 2020-12-17
 // feature: write, strb
 //--------------------------------------------------------------------------
+// date: 2020-12-19
+// read process
+//--------------------------------------------------------------------------
 
 
 `timescale 1ns/1ns
@@ -80,6 +83,9 @@ initial begin
   #50 w_a_d(3'd3,32'h1234_5678,4'b1111);
   #50 w_a_d(3'd3,32'h9999_aaaa,4'b1010);
 
+  #50 read(3'd1);
+  #50 read(3'd4);
+
 end
 
 
@@ -126,6 +132,22 @@ begin
   bready = 1'b0;
 end
 endtask
+
+
+// read process
+task read(input [addr_width-1:0] address);
+begin
+  @(posedge aclk)
+  arvalid = 1'b1;
+  araddr = address;
+  @(posedge aclk)
+  rready = 1'b1;
+  arvalid = 1'b0;
+  @(posedge aclk)
+  rready = 1'b0;
+end
+endtask
+
 
 // aclk generate
 always #2 aclk <= ~aclk;
