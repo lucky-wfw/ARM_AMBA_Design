@@ -7,6 +7,9 @@
 // date: 2020-12-17
 // write process, wstrb feature
 //--------------------------------------------------------------------------
+// date: 2020-12-19
+// read process
+//--------------------------------------------------------------------------
 
 module axi4_lite_slave
 #(
@@ -38,12 +41,12 @@ module axi4_lite_slave
 
   // Read address channel
   input arvalid,
-  output reg arready,
+  output arready,
   input [addr_width-1:0] araddr,
   input arprot,
 
   // Read data channel
-  output reg rvalid,
+  output rvalid,
   input rready,
   output reg [data_width-1:0] rdata,
   output reg [1:0] rresp
@@ -66,7 +69,15 @@ w_s3 = 3'b011, w_s4 = 3'b100, w_s5 = 3'b101, w_s6 = 3'b110;
 reg [data_width-1:0] w_data_buff;
 reg [addr_width-1:0] w_addr_buff;
 
+//---------------------------------------------------
+// The definition of state machine for read process
+//---------------------------------------------------
+reg [1:0] r_state;
+reg [1:0] r_next_state;
 
+parameter r_idle = 2'b00, r_s1 = 2'b01, r_s2 = 2'b10;
+
+reg [addr_width-1:0] r_addr_buff;
 
 
 //----------------------------------------------------
@@ -307,7 +318,84 @@ always @(posedge aclk, negedge aresetn) begin
   end
 end
 
+//----------------------------------------------------
+// The read process of state machine
+//----------------------------------------------------
+always @(posedge aclk, negedge aresetn) begin
+  if(!aresetn) begin
+    r_state <= r_idle;
+  end
+  else begin
+    r_state <= r_next_state;
+  end
+end
 
+
+always @(*) begin
+  case(r_state)
+    r_idle: begin
+      if((arvalid == 1'b1)&&(arready == 1'b1))begin
+        r_next_state <= r_s1;
+      end
+      else begin
+        r_next_state <= r_idle;
+      end
+    end
+    r_s1: begin
+      if((rvalid == 1'b1)&&(rready == 1'b1))begin
+        r_next_state <= r_s2;
+      end
+      else begin
+        r_next_state <= r_s1;
+      end
+    end
+    r_s2: begin
+      if((arvalid == 1'b1)&&(arready == 1'b1))begin
+        r_next_state <= r_s1;
+      end
+      else begin
+        r_next_state <= r_idle;
+      end
+    end
+    default: begin
+      r_next_state <= r_idle;
+    end
+  endcase
+end
+
+always @(posedge aclk, negedge aresetn) begin
+  if(!aresetn) begin
+    rdata <= 32'h0000_0000;
+    rresp <= 2'b00;
+    r_addr_buff <= 3'b000;
+  end
+  else begin
+    case(r_next_state)
+      r_idle: begin
+        rdata <= rdata;
+        rresp <= rresp;
+        r_addr_buff <= r_addr_buff;
+      end
+      r_s1: begin
+        r_addr_buff <= araddr;
+      end
+      r_s2: begin
+        if((w_next_state == w_s5)&&(r_addr_buff == w_addr_buff)) begin
+          rdata <= w_data_buff;
+          rresp <= 2'b00;
+        end
+        else if(mem_flag[r_addr_buff] == 1'b1) begin
+          rdata <= mem[r_addr_buff];
+          rresp <= 2'b00;
+        end
+        else begin
+          rdata <= 32'h0000_0000;
+          rresp <= 2'b01;
+        end
+      end
+    endcase
+  end
+end
 
 
 //-----------------------------------------------------------
@@ -317,8 +405,8 @@ end
 assign awready = 1'b1;
 assign wready = 1'b1;
 assign bvalid = 1'b1;
-
-
+assign arready = 1'b1;
+assign rvalid = 1'b1;
 
 
 endmodule
